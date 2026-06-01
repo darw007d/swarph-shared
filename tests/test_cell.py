@@ -29,8 +29,8 @@ def test_schema_version_v1_is_only_supported_version():
     assert VALID_SCHEMA_VERSIONS == frozenset({"v1"})
 
 
-def test_valid_providers_v0_7_is_claude_only():
-    assert VALID_PROVIDERS == frozenset({"claude"})
+def test_valid_providers():
+    assert VALID_PROVIDERS == frozenset({"claude", "antigravity"})
 
 
 def test_peer_name_re_accepts_kebab_and_snake():

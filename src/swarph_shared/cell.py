@@ -55,7 +55,7 @@ PEER_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,63}$")
 # additive-optional new providers extend this frozenset without
 # breaking existing imports. Schema_version on Cell carries version
 # semantics; constants don't need redundant version tagging.
-VALID_PROVIDERS = frozenset({"claude"})
+VALID_PROVIDERS = frozenset({"claude", "antigravity"})
 
 
 class CellError(ValueError):
