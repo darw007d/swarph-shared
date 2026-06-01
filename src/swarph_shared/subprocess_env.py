@@ -4,9 +4,13 @@ must NOT inherit billing-path env keys).
 **SCOPE — read carefully**: this denylist guards the BILLING PATH only —
 keeping `claude -p` on subscription auth (`~/.claude/.credentials.json`)
 instead of metered API. It does NOT cover general secret-leakage concerns.
-Future auth-token shapes (e.g. ANTHROPIC_AUTH_TOKEN, OPENAI_BEARER, OAUTH_*,
-*_SECRET, *_TOKEN) are NOT caught here — those are a separate-concern
-allowlist if/when added.
+As of the 2026-06-01 adversarial-sweep CRIT, this now ALSO catches the
+billing/auth-REDIRECT class — the ``*_AUTH_TOKEN`` and ``*_BASE_URL`` suffixes
+plus explicit GCP/Vertex creds — which flip ``claude -p`` (and the other
+subscription CLIs) from subscription auth to a metered/relay endpoint while
+cost_usd still reports 0.0. Other secret shapes (OPENAI_BEARER, OAUTH_*,
+*_SECRET) remain out of scope — this is the BILLING denylist, not a general
+secret-leak allowlist.
 
 When new billing-relevant key shapes appear, add them to
 ``FORBIDDEN_KEYS_EXPLICIT`` here.
@@ -48,7 +52,26 @@ FORBIDDEN_KEYS_EXPLICIT = frozenset({
     "GEMINI_API_KEY",
     "GOOGLE_API_KEY",
     "DEEPSEEK_API_KEY",
+    # Billing/auth REDIRECT vars — these flip `claude -p` (and the other
+    # subscription CLIs) from subscription auth to a metered/relay endpoint
+    # WITHOUT ending in `_API_KEY`, so the suffix rule alone missed them.
+    # Adversarial-sweep CRIT 2026-06-01: ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN
+    # set in the parent env (e.g. an identity-proxy / metered relay) silently
+    # bills off-subscription while cost_usd still reports 0.0.
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+    "OPENAI_BASE_URL",
+    "OPENAI_API_BASE",
+    "GEMINI_BASE_URL",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "GOOGLE_CLOUD_PROJECT",
+    "VERTEX_PROJECT",
+    "VERTEX_LOCATION",
 })
+
+# Suffix sweep beside the explicit set — catches provider-namespaced variants
+# of the same billing/auth-redirect shapes (e.g. <X>_AUTH_TOKEN, <X>_BASE_URL).
+FORBIDDEN_SUFFIXES = ("_API_KEY", "_AUTH_TOKEN", "_BASE_URL")
 
 
 def scrub_env_for_subprocess() -> dict:
@@ -74,7 +97,7 @@ def scrub_env_for_subprocess() -> dict:
     return {
         k: v
         for k, v in os.environ.items()
-        if k not in FORBIDDEN_KEYS_EXPLICIT and not k.endswith("_API_KEY")
+        if k not in FORBIDDEN_KEYS_EXPLICIT and not k.endswith(FORBIDDEN_SUFFIXES)
     }
 
 
@@ -110,14 +133,20 @@ def verify_subscription_setup(
     if claude_bin is None:
         claude_bin = os.environ.get("CLAUDE_BIN", "/root/.local/bin/claude")
 
-    saved = os.environ.get("ANTHROPIC_API_KEY")
+    # The billing/auth-REDIRECT vars that MUST be scrubbed — not just the API
+    # key but the AUTH_TOKEN/BASE_URL class that silently flips subscription
+    # billing to a metered/relay endpoint (adversarial-sweep CRIT 2026-06-01).
+    _MUST_SCRUB = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
+    _saved = {k: os.environ.get(k) for k in _MUST_SCRUB}
     try:
-        os.environ["ANTHROPIC_API_KEY"] = "sk-ant-FAKE-FOR-TEST"
+        for k in _MUST_SCRUB:
+            os.environ[k] = "FAKE-FOR-TEST"
         scrubbed = scrub_env_for_subprocess()
-        if "ANTHROPIC_API_KEY" in scrubbed:
+        leaked = [k for k in _MUST_SCRUB if k in scrubbed]
+        if leaked:
             raise RuntimeError(
                 "swarph_shared.subprocess_env: scrub_env_for_subprocess did "
-                "not remove ANTHROPIC_API_KEY"
+                f"not remove billing/auth-redirect var(s): {leaked}"
             )
         if "PATH" not in scrubbed:
             raise RuntimeError(
@@ -125,10 +154,11 @@ def verify_subscription_setup(
                 "over-pruned (PATH missing)"
             )
     finally:
-        if saved is None:
-            os.environ.pop("ANTHROPIC_API_KEY", None)
-        else:
-            os.environ["ANTHROPIC_API_KEY"] = saved
+        for _k, _v in _saved.items():
+            if _v is None:
+                os.environ.pop(_k, None)
+            else:
+                os.environ[_k] = _v
 
     if not creds_path.exists():
         raise RuntimeError(
