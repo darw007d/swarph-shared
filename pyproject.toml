@@ -30,8 +30,8 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/darw007d/swarph-shared"
-Source = "https://github.com/darw007d/swarph-shared"
+Homepage = "https://github.com/BrainSurfing-tech/swarph-shared"
+Source = "https://github.com/BrainSurfing-tech/swarph-shared"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]

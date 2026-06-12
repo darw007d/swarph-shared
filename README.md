@@ -1,6 +1,6 @@
 # swarph-shared
 
-Four small, dependency-free substrate primitives for building multi-LLM mesh tooling — the bottom of the [`swarph-mesh`](https://github.com/darw007d/swarph-mesh) dependency stack. Each solves one sharp problem that bites anyone wiring multiple LLM providers together:
+Four small, dependency-free substrate primitives for building multi-LLM mesh tooling — the bottom of the [`swarph-mesh`](https://github.com/BrainSurfing-tech/swarph-mesh) dependency stack. Each solves one sharp problem that bites anyone wiring multiple LLM providers together:
 
 - **`caller_convention`** — a single source of truth for the dotted-slug caller-id regex, so usage-attribution joins across billing paths never break silently when a second producer starts writing tagged rows
 - **`subprocess_env`** — env scrubbing for `claude -p` (and any subprocess that must not inherit billing-path keys), so a stray `ANTHROPIC_API_KEY` can't silently flip a subscription call onto metered API billing
@@ -121,7 +121,7 @@ These four are the bottom of the swarph-mesh dependency stack — every higher-l
 ## Versioning + dev
 
 ```bash
-git clone https://github.com/darw007d/swarph-shared
+git clone https://github.com/BrainSurfing-tech/swarph-shared
 cd swarph-shared
 python -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
